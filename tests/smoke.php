@@ -61,6 +61,13 @@ try {
     [$json,$path]=upload();
     [$status,$body]=http($path);check($status===200 && getimagesizefromstring($body)[0]===320,'upload and original image read');
     $plain=$body;
+    [$status,$body]=http('/app/upload.php',['sign'=>(string)time(),'file'=>new CURLFile($fixture,'image/png','browser-fixture.png')]);
+    $browser=json_decode($body,true);
+    check($status===200 && ($browser['result']??'')==='success','browser upload endpoint');
+    $browserPath=parse_url($browser['url'],PHP_URL_PATH);
+    $created[]=$browserPath;
+    [$status,$body]=http($browserPath);
+    check($status===200 && getimagesizefromstring($body)[0]===320,'browser upload image read');
     [$status,$body]=http('/api/index.php',['token'=>'invalid','image'=>new CURLFile($fixture,'image/png','invalid.png')]);
     check((json_decode($body,true)['code']??null)===202,'invalid API token rejected');
     [$status,$body]=http(parse_url($json['del'],PHP_URL_PATH).'?'.parse_url($json['del'],PHP_URL_QUERY));
