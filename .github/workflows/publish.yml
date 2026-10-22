@@ -1,0 +1,77 @@
+name: Build, test and publish
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '27 3 * * 1'
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  IMAGE: ghcr.io/kkkkeybird/easyimage-docker
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            architecture: amd64
+          - runner: ubuntu-24.04-arm
+            architecture: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          pull: true
+          load: true
+          tags: easyimage:test
+          cache-from: type=gha,scope=${{ matrix.architecture }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.architecture }}
+      - name: Check PHP syntax and run real HTTP tests
+        run: |
+          docker run --rm --entrypoint sh easyimage:test -c 'find /app/web -name "*.php" -print0 | xargs -0 -n1 php -l >/dev/null'
+          docker run -d --name easyimage-test easyimage:test
+          docker exec -i easyimage-test php < tests/smoke.php
+          docker exec easyimage-test php -v
+      - name: Publish tested architecture
+        run: |
+          docker tag easyimage:test "$IMAGE:build-${{ github.run_id }}-${{ matrix.architecture }}"
+          docker push "$IMAGE:build-${{ github.run_id }}-${{ matrix.architecture }}"
+      - name: Container logs
+        if: failure()
+        run: docker logs easyimage-test || true
+      - name: Clean up test container
+        if: always()
+        run: docker rm -f easyimage-test || true
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish multi-architecture tags
+        run: |
+          docker buildx imagetools create \
+            --tag "$IMAGE:latest" \
+            --tag "$IMAGE:2.8.6" \
+            --tag "$IMAGE:php8.4" \
+            --tag "$IMAGE:build-${{ github.run_id }}" \
+            "$IMAGE:build-${{ github.run_id }}-amd64" \
+            "$IMAGE:build-${{ github.run_id }}-arm64"
