@@ -31,7 +31,7 @@ empty API token list. `DEBUG=true` enables PHP error display for troubleshooting
 - Each build pulls the latest `php:8.4-fpm-bookworm` base. Builds fail if PHP is
   older than **8.4.27**, which fixes CVE-2026-109618 and CVE-2026-109619.
 - Before publication, both architectures pass PHP syntax checks and real HTTP
-  tests covering upload, retrieval, deletion, API authentication, compression,
+  tests covering browser/API upload, retrieval, deletion, thumbnails, authentication, compression,
   text/image watermarks, private paths and upload-directory PHP blocking.
 - `latest`, `2.8.6` and `php8.4` are moving tags. `build-RUN_ID` identifies a
   particular successful workflow publication. Pin the image digest for stronger

@@ -68,6 +68,10 @@ try {
     $created[]=$browserPath;
     [$status,$body]=http($browserPath);
     check($status===200 && getimagesizefromstring($body)[0]===320,'browser upload image read');
+    $thumbUrl=parse_url($browser['thumb']);
+    [$status,$body]=http($thumbUrl['path'].(isset($thumbUrl['query'])?'?'.$thumbUrl['query']:''));
+    $thumbSize=@getimagesizefromstring($body);
+    check($status===200 && $thumbSize!==false && $thumbSize[0]<320,'dynamic thumbnail generation');
     [$status,$body]=http('/api/index.php',['token'=>'invalid','image'=>new CURLFile($fixture,'image/png','invalid.png')]);
     check((json_decode($body,true)['code']??null)===202,'invalid API token rejected');
     [$status,$body]=http(parse_url($json['del'],PHP_URL_PATH).'?'.parse_url($json['del'],PHP_URL_QUERY));
